@@ -22,6 +22,14 @@ if (!process.env.ADDRESS) {
   throw new Error('Must supply environment variables CHARITY_ADDRESS_1');
 } else if (!process.env.CHARITY_ADDRESS_2) {
   throw new Error('Must supply environment variables CHARITY_ADDRESS_2');
+} else if (!process.env.PHONE_NUMBER_0) {
+  throw new Error('Must supply environment variables PHONE_NUMBER_0');
+} else if (!process.env.PHONE_NUMBER_1) {
+  throw new Error('Must supply environment variables PHONE_NUMBER_1');
+} else if (!process.env.PHONE_NUMBER_2) {
+  throw new Error('Must supply environment variables PHONE_NUMBER_2');
+} else if (!process.env.USD_TO_DONATE) {
+  throw new Error('Must supply environment variables USD_TO_DONATE');
 }
 
 var remote = new Remote({
@@ -45,7 +53,6 @@ app.use(bodyParser.urlencoded());
 var twilioClient = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
 
 var serverStartTime = Date.now();
-var usd_to_donate = 5;
 var guests = [];
 var usd_donated = 0;
 var charity_usd_balances = [0,0,0];
@@ -62,7 +69,7 @@ function convertToUSD(usd_to_buy, xrp_drops_to_spend) {
   var tx = remote.transaction();
   tx.offerCreate(process.env.ADDRESS, {
     'currency':'USD',
-    'issuer':USD_ISSUER,
+    'issuer':process.env.USD_ISSUER,
     'value':usd_to_buy
   }, xrp_drops_to_spend);
 
@@ -71,8 +78,8 @@ function convertToUSD(usd_to_buy, xrp_drops_to_spend) {
       console.log(err);
       console.log(tx)
     } else {
-      console.log(result);
-      // console.log('Successfully designated ' + usd_to_spend + ' USD (' + result.metadata.DeliveredAmount.value + ' BTC) to ' + recipient);
+      console.log('Successfully designated ' + usd_to_buy + ' USD to donate to charity');
+      updateContractUSDBalance();
     }
   });
 }
@@ -98,6 +105,18 @@ function sendUSD(recipient, usd_to_send) {
       console.log(tx)
     } else {
       console.log('Successfully sent ' + usd_to_send + ' USD to ' + recipient);
+      updateContractUSDBalance();
+      switch (recipient) {
+        case process.env.CHARITY_ADDRESS_0:
+          updateCharityBalance(process.env.CHARITY_ADDRESS_0, 0);
+          break;
+        case process.env.CHARITY_ADDRESS_1:
+          updateCharityBalance(process.env.CHARITY_ADDRESS_1, 1);
+          break;
+        case process.env.CHARITY_ADDRESS_2:
+          updateCharityBalance(process.env.CHARITY_ADDRESS_2, 2);
+          break;
+      }
     }
   });
 }
@@ -106,39 +125,50 @@ app.get('/name', function(req, res) {
   res.send(guests.shift());
 });
 
-app.get('/total', function(req, res) {
-  //Could this look at the ripple account's USD balance?
+app.get('/tobedonated', function(req, res) {
   res.send(usd_donated);
 });
 
 app.get('/charity0', function(req, res) {
-  res.send(charity_usd_balances[0]);
+  res.send(charity_usd_balances[0].toString());
 });
 
 app.get('/charity1', function(req, res) {
-  res.send(charity_usd_balances[1]);
+  res.send(charity_usd_balances[1].toString());
 });
 
 app.get('/charity2', function(req, res) {
-  res.send(charity_usd_balances[2]);
+  res.send(charity_usd_balances[2].toString());
+});
+
+app.get('/phonenumber0', function(req, res) {
+  res.send(process.env.PHONE_NUMBER_0);
+});
+
+app.get('/phonenumber1', function(req, res) {
+  res.send(process.env.PHONE_NUMBER_1);
+});
+
+app.get('/phonenumber2', function(req, res) {
+  res.send(process.env.PHONE_NUMBER_2);
 });
 
 // Envoy webhook POST request for each new visitor sign in.
 // https://signwithenvoy.com/account/edit/webhook
 app.post('/signin', function(req, res) {
   var signin = req.body;
+  console.log(signin);
+  var entry = JSON.parse(signin.entry);
 
-  console.log(signin.entry.your_full_name + ' signed in');
+  console.log(entry.your_full_name + ' signed in');
 
   //TODO: Confirm signature is from Envoy using signin.token && signin.timestamp
 
   if (signin.status==='sign_in') {
-    usd_donated += usd_to_donate;
-    guests.push(signin.entry.your_full_name);
+    guests.push(entry.your_full_name);
   }
 
-  // sendPayment();
-  convertToUSD(usd_to_donate, 100);
+  convertToUSD(process.env.USD_TO_DONATE, parseFloat(process.env.USD_TO_DONATE) * 300000000);
 
   res.set('Content-Type', 'text/xml');
   res.sendStatus(200);
@@ -146,19 +176,15 @@ app.post('/signin', function(req, res) {
 
 // Receive SMS notifications from Twilio
 // https://www.twilio.com/user/account/phone-numbers/incoming
-//1 830-549-6093
 app.post('/sms0', function(req, res) {
-  charity_usd_balances[0] += usd_to_donate;
   handleSms(req.body, process.env.CHARITY_ADDRESS_0, res);
 });
 
 app.post('/sms1', function(req, res) {
-  charity_usd_balances[1] += usd_to_donate;
   handleSms(req.body, process.env.CHARITY_ADDRESS_1, res);
 });
 
 app.post('/sms2', function(req, res) {
-  charity_usd_balances[2] += usd_to_donate;
   handleSms(req.body, process.env.CHARITY_ADDRESS_2, res);
 });
 
@@ -188,9 +214,8 @@ function handleSms(incomingMessage, charity_address, res) {
     if (fundingRequests.length) {
       sendTwilioResponse(res, 'We\'re sorry, but you can only vote once in the Codius demo.');
     } else {
-      usd_donated -= usd_to_donate;
-      sendUSD(charity_address, usd_to_donate);
-      sendTwilioResponse(res, 'Thanks for participating in the Codius demo! $' + usd_to_donate + ' will be donated to your selected charity.');
+      sendUSD(charity_address, process.env.USD_TO_DONATE);
+      sendTwilioResponse(res, 'Thanks for participating in the Codius demo! $' + process.env.USD_TO_DONATE + ' will be donated to your selected charity.');
     }
   });
 }
@@ -203,8 +228,50 @@ function sendTwilioResponse(res, message) {
   res.send(twiml.toString());
 }
 
+function getUSDBalance(account, callback) {
+  remote.requestAccountLines({'account':account}, function (err, result) {
+    if (err) {
+      callback(err);
+    } else {
+      var i;
+      for (i=0; i<result.lines.length; i++) {
+        if (result.lines[i].account===process.env.USD_ISSUER &&
+            result.lines[i].currency==='USD') {
+          callback(null, parseFloat(result.lines[i].balance).toFixed(2));
+          break;
+        }
+      }
+    }
+  });
+}
+
+function updateContractUSDBalance() {
+  getUSDBalance(process.env.ADDRESS, function(err, balance) {
+    if (err) {
+      console.log(err);
+    } else {
+      usd_donated = balance;
+    }
+  });
+}
+
+function updateCharityBalance(account, charity_idx) {
+   getUSDBalance(account, function(err, balance) {
+    if (err) {
+      console.log(err);
+    } else {
+      charity_usd_balances[charity_idx] = balance
+    }
+  });
+}
+
 remote.connect(function() {
   console.log('remote connected');
+
+  updateContractUSDBalance();
+  updateCharityBalance(process.env.CHARITY_ADDRESS_0, 0);
+  updateCharityBalance(process.env.CHARITY_ADDRESS_1, 1);
+  updateCharityBalance(process.env.CHARITY_ADDRESS_2, 2);
 
   remote.set_secret(process.env.ADDRESS, process.env.SECRET);
 
