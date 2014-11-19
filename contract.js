@@ -5,6 +5,7 @@ var _ = require('underscore');
 var Remote = require('ripple-lib').Remote;
 var Amount = require('ripple-lib').Amount;
 var twilio = require('twilio');
+var cors = require('cors');
 
 if (!process.env.ADDRESS) {
   throw new Error('Must supply environment variables ADDRESS');
@@ -49,6 +50,7 @@ var remote = new Remote({
 var app = express();
 app.set('port', process.env.PORT || 8000);
 app.use(bodyParser.urlencoded());
+app.use(cors());
 
 var twilioClient = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
 
