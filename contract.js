@@ -124,35 +124,35 @@ function sendUSD(recipient, usd_to_send) {
 }
 
 app.get('/name', function(req, res) {
-  res.send(guests.shift());
+  res.json(guests.shift());
 });
 
 app.get('/tobedonated', function(req, res) {
-  res.send(usd_donated);
+  res.json(usd_donated);
 });
 
 app.get('/charity0', function(req, res) {
-  res.send(charity_usd_balances[0].toString());
+  res.json(charity_usd_balances[0].toString());
 });
 
 app.get('/charity1', function(req, res) {
-  res.send(charity_usd_balances[1].toString());
+  res.json(charity_usd_balances[1].toString());
 });
 
 app.get('/charity2', function(req, res) {
-  res.send(charity_usd_balances[2].toString());
+  res.json(charity_usd_balances[2].toString());
 });
 
 app.get('/phonenumber0', function(req, res) {
-  res.send(process.env.PHONE_NUMBER_0);
+  res.json(process.env.PHONE_NUMBER_0);
 });
 
 app.get('/phonenumber1', function(req, res) {
-  res.send(process.env.PHONE_NUMBER_1);
+  res.json(process.env.PHONE_NUMBER_1);
 });
 
 app.get('/phonenumber2', function(req, res) {
-  res.send(process.env.PHONE_NUMBER_2);
+  res.json(process.env.PHONE_NUMBER_2);
 });
 
 // Envoy webhook POST request for each new visitor sign in.
